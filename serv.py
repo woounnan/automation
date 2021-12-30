@@ -10,8 +10,8 @@ import pene
 
 requests.packages.urllib3.disable_warnings()
 
-botEmail = "hyeok.jang_soc@webex.bot"
-accessToken = "OWYxZWE4MTEtOTZiNy00YTcyLTk4NWItZmEwNTUzMTM4OTQyMTFiNGM1MTMtZmZm_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
+botEmail = "___@webex.bot"
+accessToken = "___"
 headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json"}
 
 TIME_WAIT = 0.5
