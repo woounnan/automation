@@ -7,6 +7,7 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import requests.packages.urllib3, requests, json, time, datetime, re, os, csv
 import pene
+from binascii import hexlify
 
 requests.packages.urllib3.disable_warnings()
 
@@ -240,7 +241,6 @@ def get_tasks():
     else:
         print('메시지를 받음')
         msg = response['text']
-
         result = pene.main(msg, 'string')
         if result['Error'] == -1:
             payload["text"] = result['Message']
@@ -294,4 +294,4 @@ def get_tasks():
     return ({'status': 'Success'})
 
 
-app.run(host="0.0.0.0", port=8787)
+app.run(host="0.0.0.0", port=8899)
