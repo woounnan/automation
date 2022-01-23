@@ -31,9 +31,10 @@ def compare(name, target):
         return True
 
 def getResponse(method, url, headers, data=''):
-    response = requests.request(method.upper(), url, headers=headers, data=data, stream=False, verify=False, timeout=3)
-    response.raise_for_status()
-    response.encoding = None
+    response = requests.request(method.upper(), url, headers=headers, data=data, stream=False, verify=False, timeout=10)
+    if str(response.status_code)[0] == '2':
+        response.raise_for_status()
+        response.encoding = None
     return response
 
 
@@ -43,13 +44,15 @@ def main(request, checkType, url=""):
     data, headers = {}, {}
     verb, path, host, lineBreak = '', '', '', ''
     type_file = False
+    protocol = 'HTTPS'
     try:
         format_REQ = json.loads(unquote(request))
     except:
         try:
-            search_methodDefinitions = '(\w+)\s(\/.*)\sHTTP\/(?:1\.[10]|2)(\.\.|#015#012|\s*\n\s*)\w'
+            search_methodDefinitions = '(\w+)\s(\/.*)\sHTTP\/(?:1\.[10]|2)(\.\.|#015#012|\s*\n\s*|\\r\\n)\w'
             verb, path, lineBreak = matched = re.findall(search_methodDefinitions, request)[0]
             lineBreak = lineBreak.strip(' ')
+            
             #request = re.sub('({})([\w-]*\s*:)'.format(lineBreak), r'\1\1\2', unquote(request))
             #print('rawdata : ', request, '\n\n')
 
@@ -64,6 +67,7 @@ def main(request, checkType, url=""):
                     break
                 matched = matched[0]
                 if compare('host', matched[0]):
+                    port = re.search(':(\d+)', matched[1])
                     host = re.sub(':\d+', '', matched[1])
                     continue
                 elif compare('content-type', matched[0]):
@@ -94,9 +98,15 @@ def main(request, checkType, url=""):
                     #rawdata = mySub(f'(?:{lineBreak})(' + boundary + '(?:-{2})*)', r'\n\1', rawdata)
                     #rawdata = re.sub('({}(?:-{2})*)(?:\.{2}|#015#012)'.format(boundary), r'\1\n', rawdata)
                 data = rawdata.strip()
+                if port != None:
+                    port = port.group(1)
+                    if port == '443':
+                        protocol = 'HTTPS'
+                    elif port == '80':
+                        protocol = 'HTTP'
             format_REQ = {
-                'Protocol': setSyntax('HTTPS'),
-                'Verb': setSyntax(verb),
+                'Protocol': protocol.upper(),
+                'Verb': verb.upper(),
                 'Path': path,
                 'Host': host,
                 'Headers': headers,
@@ -111,11 +121,13 @@ def main(request, checkType, url=""):
             url = url + format_REQ['Path']
         else:
             url = '{}://'.format(format_REQ['Protocol'].lower()) + format_REQ['Host'] + format_REQ['Path']
-        format_REQ['Headers']['Content-Length'] = str(len(format_REQ['Data']) + 10)
+        len_rawdata = len(rawdata)
+        if len_rawdata > 0:
+            format_REQ['Headers']['Content-Length'] = str(len(rawdata) + 10)
         response = getResponse(format_REQ['Verb'], url, format_REQ['Headers'], format_REQ['Data'])
     except Exception as e:
         print('error msg : ', str(e))
-        return {'Error': -2, 'Message': setErrorAppendix('<응답값을 받아오지 못했습니다> \n[{}]'.format(str(e)), checkType), 'Format': format_REQ}
+        return {'Error': -2, 'Message': setErrorAppendix('<응답값을 받아오지 못했습니다> \n[{}]'.format(re.sub('0x[0-9a-f]{2,16}', '0x[***************]', str(e))), checkType), 'Format': format_REQ}
     return {'Error': 0, 'Message': '', 'Format': format_REQ, 'Response': response}
 
 
