@@ -19,7 +19,41 @@ headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "applicat
 
 TIME_WAIT = 0.5
 
+def print_hex_dump(buffer, start_offset=0):
+    print('-' * 79)
 
+    offset = 0
+    while offset < len(buffer):
+        # Offset
+        print(' %08X : ' % (offset + start_offset), end='')
+
+        if ((len(buffer) - offset) < 0x10) is True:
+            data = buffer[offset:]
+        else:
+            data = buffer[offset:offset + 0x10]
+
+        # Hex Dump
+        for hex_dump in data:
+            print('hexdump : ', hex_dump)
+            print("%02X" % int(hex_dump, 16), end=' ')
+
+        if ((len(buffer) - offset) < 0x10) is True:
+            print(' ' * (3 * (0x10 - len(data))), end='')
+
+        print('  ', end='')
+
+        # Ascii
+        for ascii_dump in data:
+            if ((ascii_dump >= 0x20) is True) and ((ascii_dump <= 0x7E) is True):
+                print(chr(ascii_dump), end='')
+            else:
+                print('.', end='')
+
+        offset = offset + len(data)
+        print('')
+
+    print('-' * 79)
+    
 class CSVTypeError(Exception):
     pass
 
@@ -39,7 +73,7 @@ def sendFile(fullPath, roomId, text=""):
          --header "Authorization: Bearer {accessToken}"\
          --form "files=@{fullPath};type=image/png"\
          --form "roomId={roomId}"\
-         --form "text=example attached"\
+         --form "text={text}"\
          https://webexapis.com/v1/messages"""
         os.system(cmd)
         os.system('rm -f ' + fullPath)
@@ -213,8 +247,7 @@ def get_tasks():
                                                 data=json.dumps(payload), headers=headers)
                 idx += 1
             print('Completion!')
-            payload["text"] = '[*] 진행률 : {0}% [ {1} / {2} ] \n'.format(progress, idx - 1, totalLen) + '▶' * (
-                        c * extend) + '▷ ' * (10 * extend - (c * extend))
+            payload["text"] = '[*] 진행률 : 100% [ {0} / {1} ] \n'.format(idx - 1, totalLen) + '▶' * (10*extend)
             response = requests.request("PUT", "https://webexapis.com/v1/messages/{}".format(messageId),
                                         data=json.dumps(payload), headers=headers)
 
@@ -240,8 +273,19 @@ def get_tasks():
 
     else:
         print('메시지를 받음')
+        beautify = False
         msg = response['text']
-        result = pene.main(msg, 'string')
+        if msg.startswith('beautify;'):
+            beautify = True
+            msg = msg[len('beautify;'):]
+        test_msg =['''GET /Check.html?TV9JRD0wMDA2OTE2OTMwXzIyNDEyMzc3&U1RZUEU9QVVUTw==&TElTVF9UQUJMRT1FTVNfQVVUT19TRU5EX0xJU1RfMDU=&UE9TVF9JRD0yMDIyMDEyNV8xMDMw&VEM9MjAyMjAyMDE=&U0VSVkVSX0lEPTA0&S0lORD1D&Q0lEPTAwMw==&URL=https://itunes.apple.com/kr/app/laim-i.point-jeoglib-seolmun/id1076506268 HTTP/1.1\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 10.0; Win64; x64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729; Microsoft Outlook 15.0.5172; Microsoft Outlook 15.0.5172; ms-office; MSOffice 15)\r\nAccept: */*\r\nAccept-Encoding: identity\r\nReferer: http://mail.CTR.CO.KR/read\r\nHost: send04.lpoint.com\r\nConnection: keep-alive\r\nCookie: TS0127e1d1=019300210072d5bce2bbb522518549263e8d4c24fff95940d7db97bf79e233af3bcc06a8f3c0c88bcb0c40bfefdcc08c69f93b16ef\r\n\r\n"''']
+        '''
+        print('###### msg ###########')
+        print_hex_dump(msg)
+        print('###### test_msg ###########')
+        print_hex_dump(test_msg)
+        '''
+        result = pene.main(msg, 'string', beautify=beautify)
         if result['Error'] == -1:
             payload["text"] = result['Message']
             response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload),
@@ -249,11 +293,16 @@ def get_tasks():
             return ({'status': 'Failure'})
 
         #payload["text"] = '[*] 요청값\n' + json.dumps(result['Format'], indent=2)
-        payload["text"] = '[*] 요청값\n' + MyJsonDumps(result['Format'])
+        payload["text"] = '[*] 요청값\n' + result['RAW_REQUEST']
+        response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload), headers=headers)
+        
+        payload["text"] = '[*] 요청값 - JSON\n' + MyJsonDumps(result['Format'])
         response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload), headers=headers)
         #response = requests.request("POST", "https://webexapis.com/v1/messages", data=MyJsonDumps(payload),headers=headers)
 
-
+        if beautify:
+            return ({'status': 'Success'})
+        
         if result['Error'] == -2:
             payload["text"] = result['Message']
             response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload),
@@ -283,7 +332,7 @@ def get_tasks():
         response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload),
                                     headers=headers)
         fullPath = fPath + '/' + fName
-        sendFile(fullPath, roomId, '외부망에서 실행하세요()')
+        sendFile(fullPath, roomId, '외부망 실행 권장')
 
         # response = requests.request("POST", "https://webexapis.com/v1/messages", headers=headers, data={'files' : f,  'roomId' : roomId, 'text': 'test'})
         # response = requests.request("POST", "https://webexapis.com/v1/messages", headers=headers, data=f)
