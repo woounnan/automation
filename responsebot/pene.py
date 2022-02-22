@@ -38,7 +38,7 @@ def getResponse(method, url, headers, data=''):
     return response
 
 
-def main(request, checkType, url=""):
+def main(request, checkType, url="", beautify=False):
     setSyntax = lambda s: s[0].upper() + s[1:].lower() if len(s) > 0 else ''
     setErrorAppendix = lambda s, f: s if f == 'file' else '[*] 오류 발생 \n ' + s
     data, headers = {}, {}
@@ -50,6 +50,7 @@ def main(request, checkType, url=""):
     except:
         try:
             search_methodDefinitions = '(\w+)\s(\/.*)\sHTTP\/(?:1\.[10]|2)(\.\.|#015#012|\s*\n\s*|\\r\\n)\w'
+            request = unquote(request)
             verb, path, lineBreak = matched = re.findall(search_methodDefinitions, request)[0]
             lineBreak = lineBreak.strip(' ')
             
@@ -57,7 +58,10 @@ def main(request, checkType, url=""):
             #print('rawdata : ', request, '\n\n')
 
             #request = request.replace(lineBreak * 2, '\n').split('\n')
-            request = request.replace(lineBreak, '\n').split('\n')
+            raw_request = request.replace(lineBreak, '\n')
+            request = raw_request.split('\n')
+            
+            
             search_headerFields = '^([\w-]+)\s*:\s*(.+)'
             c = 0
             for i, line in enumerate(request[1:], start=1):
@@ -98,12 +102,12 @@ def main(request, checkType, url=""):
                     #rawdata = mySub(f'(?:{lineBreak})(' + boundary + '(?:-{2})*)', r'\n\1', rawdata)
                     #rawdata = re.sub('({}(?:-{2})*)(?:\.{2}|#015#012)'.format(boundary), r'\1\n', rawdata)
                 data = rawdata.strip()
-                if port != None:
-                    port = port.group(1)
-                    if port == '443':
-                        protocol = 'HTTPS'
-                    elif port == '80':
-                        protocol = 'HTTP'
+            if port != None:
+                port = port.group(1)
+                if port == '443':
+                    protocol = 'HTTPS'
+                elif port == '80':
+                    protocol = 'HTTP'
             format_REQ = {
                 'Protocol': protocol.upper(),
                 'Verb': verb.upper(),
@@ -124,11 +128,13 @@ def main(request, checkType, url=""):
         len_rawdata = len(rawdata)
         if len_rawdata > 0:
             format_REQ['Headers']['Content-Length'] = str(len(rawdata) + 10)
+        if beautify:
+            return {'Error': 0, 'Format': format_REQ, 'RAW_REQUEST' : raw_request}
         response = getResponse(format_REQ['Verb'], url, format_REQ['Headers'], format_REQ['Data'])
     except Exception as e:
         print('error msg : ', str(e))
-        return {'Error': -2, 'Message': setErrorAppendix('<응답값을 받아오지 못했습니다> \n[{}]'.format(re.sub('0x[0-9a-f]{2,16}', '0x[***************]', str(e))), checkType), 'Format': format_REQ}
-    return {'Error': 0, 'Message': '', 'Format': format_REQ, 'Response': response}
+        return {'Error': -2, 'Message': setErrorAppendix('<응답값을 받아오지 못했습니다> \n[{}]'.format(re.sub('0x[0-9a-f]{2,16}', '0x[***************]', str(e))), checkType), 'Format': format_REQ, 'RAW_REQUEST' : raw_request}
+    return {'Error': 0, 'Message': '', 'Format': format_REQ, 'Response': response, 'RAW_REQUEST' : raw_request}
 
 
 if __name__ == '__main__':
