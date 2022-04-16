@@ -15,8 +15,7 @@ botEmail = "hyeok_jang_responsebot@webex.bot"
 #botEmail = "onepiecehomebot@webex.bot"
 accessToken = "NTU3MWEwMGQtZGIzMi00N2EzLTllNzEtNzE3MTg5MGY5N2MzZDA4YTkzZjEtZGFl_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
 #accessToken = "N2MyNzY5OTAtODA4ZS00ZTA3LWI4YmYtYWE5MmJiODg2NmQ3YmY5MjBkNTAtMWFl_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
-headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json"}
-
+headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json", 'Accept' : 'application/json'}
 TIME_WAIT = 0.5
 
 def print_hex_dump(buffer, start_offset=0):
@@ -105,7 +104,7 @@ def MyJsonDumps(jsonData, idx = 0, indent = 5):
 
 app = Flask(__name__)
 
-
+#@app.post("/")
 @app.route('/', methods=['POST'])
 def get_tasks():
     data = request.json.get('data')
@@ -274,12 +273,17 @@ def get_tasks():
     else:
         print('메시지를 받음')
         beautify = False
-        
         msg = response['text']
         if msg.startswith('beautify;'):
             beautify = True
             msg = msg[len('beautify;'):]
-
+        test_msg =['''GET /Check.html?TV9JRD0wMDA2OTE2OTMwXzIyNDEyMzc3&U1RZUEU9QVVUTw==&TElTVF9UQUJMRT1FTVNfQVVUT19TRU5EX0xJU1RfMDU=&UE9TVF9JRD0yMDIyMDEyNV8xMDMw&VEM9MjAyMjAyMDE=&U0VSVkVSX0lEPTA0&S0lORD1D&Q0lEPTAwMw==&URL=https://itunes.apple.com/kr/app/laim-i.point-jeoglib-seolmun/id1076506268 HTTP/1.1\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 10.0; Win64; x64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729; Microsoft Outlook 15.0.5172; Microsoft Outlook 15.0.5172; ms-office; MSOffice 15)\r\nAccept: */*\r\nAccept-Encoding: identity\r\nReferer: http://mail.CTR.CO.KR/read\r\nHost: send04.lpoint.com\r\nConnection: keep-alive\r\nCookie: TS0127e1d1=019300210072d5bce2bbb522518549263e8d4c24fff95940d7db97bf79e233af3bcc06a8f3c0c88bcb0c40bfefdcc08c69f93b16ef\r\n\r\n"''']
+        '''
+        print('###### msg ###########')
+        print_hex_dump(msg)
+        print('###### test_msg ###########')
+        print_hex_dump(test_msg)
+        '''
         result = pene.main(msg, 'string', beautify=beautify)
         if result['Error'] == -1:
             payload["text"] = result['Message']
@@ -291,7 +295,7 @@ def get_tasks():
         payload["text"] = '[*] 요청값\n' + result['RAW_REQUEST']
         response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload), headers=headers)
         
-        payload["text"] = '[*] 요청값 - JSON\n' + MyJsonDumps(result['Format'])
+        payload["text"] = '[*] 요청값 - JSON\n' + json.dumps(result['Format'], indent=2)
         response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload), headers=headers)
         #response = requests.request("POST", "https://webexapis.com/v1/messages", data=MyJsonDumps(payload),headers=headers)
 
