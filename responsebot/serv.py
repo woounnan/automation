@@ -274,17 +274,12 @@ def get_tasks():
     else:
         print('메시지를 받음')
         beautify = False
+        
         msg = response['text']
         if msg.startswith('beautify;'):
             beautify = True
             msg = msg[len('beautify;'):]
-        test_msg =['''GET /Check.html?TV9JRD0wMDA2OTE2OTMwXzIyNDEyMzc3&U1RZUEU9QVVUTw==&TElTVF9UQUJMRT1FTVNfQVVUT19TRU5EX0xJU1RfMDU=&UE9TVF9JRD0yMDIyMDEyNV8xMDMw&VEM9MjAyMjAyMDE=&U0VSVkVSX0lEPTA0&S0lORD1D&Q0lEPTAwMw==&URL=https://itunes.apple.com/kr/app/laim-i.point-jeoglib-seolmun/id1076506268 HTTP/1.1\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 10.0; Win64; x64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729; Microsoft Outlook 15.0.5172; Microsoft Outlook 15.0.5172; ms-office; MSOffice 15)\r\nAccept: */*\r\nAccept-Encoding: identity\r\nReferer: http://mail.CTR.CO.KR/read\r\nHost: send04.lpoint.com\r\nConnection: keep-alive\r\nCookie: TS0127e1d1=019300210072d5bce2bbb522518549263e8d4c24fff95940d7db97bf79e233af3bcc06a8f3c0c88bcb0c40bfefdcc08c69f93b16ef\r\n\r\n"''']
-        '''
-        print('###### msg ###########')
-        print_hex_dump(msg)
-        print('###### test_msg ###########')
-        print_hex_dump(test_msg)
-        '''
+
         result = pene.main(msg, 'string', beautify=beautify)
         if result['Error'] == -1:
             payload["text"] = result['Message']
