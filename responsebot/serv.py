@@ -12,9 +12,7 @@ from binascii import hexlify
 requests.packages.urllib3.disable_warnings()
 
 botEmail = "hyeok_jang_responsebot@webex.bot"
-#botEmail = "onepiecehomebot@webex.bot"
 accessToken = "NTU3MWEwMGQtZGIzMi00N2EzLTllNzEtNzE3MTg5MGY5N2MzZDA4YTkzZjEtZGFl_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
-#accessToken = "N2MyNzY5OTAtODA4ZS00ZTA3LWI4YmYtYWE5MmJiODg2NmQ3YmY5MjBkNTAtMWFl_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
 headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json", 'Accept' : 'application/json'}
 TIME_WAIT = 0.5
 
@@ -126,6 +124,7 @@ def get_tasks():
         requests.request("POST", "https://webexapis.com/v1/messages/", data=json.dumps(payload), headers=headers)
 
         try:
+            #웹엑스 서버에서 파일 로우데이터를 가져와서 csv 형식의 파일로 로컬에 저장
             files = response['files'][0]
             fullPath = fPath + '/' + re.search('\d{4}-\d{2}-\d{2}', response['created']).group() + '.csv'
             response = requests.request("GET", files, headers=headers)
@@ -144,12 +143,10 @@ def get_tasks():
                     # with open(fullPath, 'r', encoding='utf-8') as f:
                     # linux
                     with open(fullPath, 'r') as f:
-                        # lines = list(csv.reader(f))
                         reader = csv.reader(f)
                         rows = list(reader)
-                        # ['signature', 'host', 'uri', 'payload']
-                        # if not('signature' in rows[0][0] and 'host' in rows[0][1] and 'uri' in rows[0][2] and 'payload' in rows[0][3]):
                         for i, s in enumerate(rows[0]):
+                            #payload와 host가 담긴 필드의 인덱스를 저장
                             if 'payload' in s:
                                 idx_payload = i
                             elif 'host' in s:
@@ -159,6 +156,7 @@ def get_tasks():
                         break
                 # If null byte exists
                 except Exception as e:
+                    #널 바이트가 포함되어 있을 경우 csv 리더로 파싱되지 않기 때문에 널바이트를 제거하여 저장한 후 다시 파싱 진행
                     print(f'error [{e}]')
                     with open(fullPath, 'rb') as fi:
                         data = fi.read()
@@ -171,7 +169,7 @@ def get_tasks():
                                         headers=headers)
             if idx_payload < 0:
                 raise CSVTypeError
-
+            #앞서 저장했던 임시 csv 파일 삭제
             os.system('rm -f ' + fullPath)
 
             c = 0
@@ -191,17 +189,18 @@ def get_tasks():
                 progress = int(((idx - 1) / totalLen) * 100)
                 row = rows[idx]
                 rawdata = row[idx_payload]
-
-                # row[1] = host = 'https*://xxx.xxx.xxx'
+                #행에 하나씩 접근하면서 페이로드를 pene.main로 전달하여 응답값 확인
                 if re.match('https*://(\w+\.*)+/*', row[idx_host]) != None:
                     result = pene.main(rawdata, 'file', row[idx_host])
                 else:
                     result = pene.main(rawdata, 'file')
                 if result['Error'] != 0:
                     print('Failure')
+                    #에러일 경우 에러 처리
                     if 'HTTPConnectionPool' in result['Message'] or 'Exceeded' in result['Message']:
                         print('실패 host + url : {}'.format(result['Format']['Host'] + result['Format']['Path']))
                         if errorCount < 3:
+                            
                             payload["text"] = '[*] HTTP 연결 실패! \n[*] 5분 후 재시도 합니다. [{} / {}] --- 실패 URL : {}'.format(
                                 errorCount + 1, 3, (result['Format']['Host'] + result['Format']['Path']))
                             response = requests.request("POST", "https://webexapis.com/v1/messages",
@@ -249,7 +248,7 @@ def get_tasks():
             payload["text"] = '[*] 진행률 : 100% [ {0} / {1} ] \n'.format(idx - 1, totalLen) + '▶' * (10*extend)
             response = requests.request("PUT", "https://webexapis.com/v1/messages/{}".format(messageId),
                                         data=json.dumps(payload), headers=headers)
-
+            #작업이 완료되면 응답 통계를 계산
             stats = sorted(dict(Counter(stats)).items(), key=lambda x: x[0])
             stats = [[str(cells[0]), str(cells[1])] for cells in stats]
             csv_content = [['응답 코드 통계']]
@@ -274,39 +273,37 @@ def get_tasks():
         print('메시지를 받음')
         beautify = False
         msg = response['text']
+        #beautify;가 입력된 경우 : 테스트는 하지 않고 정리된 요청값을 보여주기만 함
         if msg.startswith('beautify;'):
             beautify = True
             msg = msg[len('beautify;'):]
-        test_msg =['''GET /Check.html?TV9JRD0wMDA2OTE2OTMwXzIyNDEyMzc3&U1RZUEU9QVVUTw==&TElTVF9UQUJMRT1FTVNfQVVUT19TRU5EX0xJU1RfMDU=&UE9TVF9JRD0yMDIyMDEyNV8xMDMw&VEM9MjAyMjAyMDE=&U0VSVkVSX0lEPTA0&S0lORD1D&Q0lEPTAwMw==&URL=https://itunes.apple.com/kr/app/laim-i.point-jeoglib-seolmun/id1076506268 HTTP/1.1\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 10.0; Win64; x64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729; Microsoft Outlook 15.0.5172; Microsoft Outlook 15.0.5172; ms-office; MSOffice 15)\r\nAccept: */*\r\nAccept-Encoding: identity\r\nReferer: http://mail.CTR.CO.KR/read\r\nHost: send04.lpoint.com\r\nConnection: keep-alive\r\nCookie: TS0127e1d1=019300210072d5bce2bbb522518549263e8d4c24fff95940d7db97bf79e233af3bcc06a8f3c0c88bcb0c40bfefdcc08c69f93b16ef\r\n\r\n"''']
-        '''
-        print('###### msg ###########')
-        print_hex_dump(msg)
-        print('###### test_msg ###########')
-        print_hex_dump(test_msg)
-        '''
+
         result = pene.main(msg, 'string', beautify=beautify)
+        #요청값을 파싱하는 도중 에러가 발생했을 때
         if result['Error'] == -1:
             payload["text"] = result['Message']
             response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload),
                                         headers=headers)
             return ({'status': 'Failure'})
 
-        #payload["text"] = '[*] 요청값\n' + json.dumps(result['Format'], indent=2)
+        #요청값 파싱이 완료되었으면 채팅방으로 전송
         payload["text"] = '[*] 요청값\n' + result['RAW_REQUEST']
         response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload), headers=headers)
         
         payload["text"] = '[*] 요청값 - JSON\n' + json.dumps(result['Format'], indent=2)
         response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload), headers=headers)
-        #response = requests.request("POST", "https://webexapis.com/v1/messages", data=MyJsonDumps(payload),headers=headers)
 
+        #beautify가 설정된 경우 요청값 반환만 하고 종료
         if beautify:
             return ({'status': 'Success'})
         
+        #응답값 확인 도중 에러가 발생했을 때
         if result['Error'] == -2:
             payload["text"] = result['Message']
             response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload),
                                         headers=headers)
             return ({'status': 'Failure'})
+        #응답 결과를 반환
         payload["text"] = '[*] 응답 코드 \n<' + str(result['Response'].status_code) + '>'
         response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload),
                                     headers=headers)
@@ -314,6 +311,7 @@ def get_tasks():
         response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload),
                                     headers=headers)
 
+        #요청 URL에서 파일이름을 가져옴
         fName = re.search('\/(\w+(?:\.\w+)*|\.\w+)(?=(?:\?\w*=.*|$))', result['Format']['Path'])
         if fName != None:
             fName = fName.group() + '.html'
@@ -322,20 +320,16 @@ def get_tasks():
 
         payload["text"] = '[*] 응답 페이지(html)'
         with open(fPath + '/' + fName, 'wb') as f:
-            # Convert relative path to absolute path
+            # 응답 페이지 내에 있는 상대 경로를 절대 경로로 수정(리소스 불러와야 하니까)
             host = 'https://' + result['Format']['Host']
-            #print('response : ', result['Response'].text)
             source = re.sub('(<.+=")(/\S+")', r'\1{}\2'.format(host), result['Response'].text)
             f.write(source.encode())
+
 
         response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload),
                                     headers=headers)
         fullPath = fPath + '/' + fName
         sendFile(fullPath, roomId, '외부망 실행 권장')
-
-        # response = requests.request("POST", "https://webexapis.com/v1/messages", headers=headers, data={'files' : f,  'roomId' : roomId, 'text': 'test'})
-        # response = requests.request("POST", "https://webexapis.com/v1/messages", headers=headers, data=f)
-
     print('[', datetime.datetime.now(), '] from (', email, ') in {', roomId, '}')
     print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
