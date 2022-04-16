@@ -1,6 +1,8 @@
 from binascii import hexlify
 from functools import reduce
 import re, json, requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 import urllib3
 from urllib.parse import unquote, quote
 urllib3.disable_warnings()
@@ -31,7 +33,14 @@ def compare(name, target):
         return True
 
 def getResponse(method, url, headers, data=''):
-    response = requests.request(method.upper(), url, headers=headers, data=data, stream=False, verify=False, timeout=10)
+    session = requests.Session()
+    retry = Retry(connect=3, backoff_factor=0.5)
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+
+    session.request(method.upper(), url, headers=headers, data=data, stream=False, verify=False, timeout=10)    
+    #response = requests.request(method.upper(), url, headers=headers, data=data, stream=False, verify=False, timeout=10)
     if str(response.status_code)[0] == '2':
         response.raise_for_status()
         response.encoding = None
@@ -46,22 +55,21 @@ def main(request, checkType, url="", beautify=False):
     type_file = False
     protocol = 'HTTPS'
     try:
+        #요청값이 이미 JSON 형태일 경우, 파싱할 필요없이 바로 json.loads
         format_REQ = json.loads(unquote(request))
     except:
         try:
             search_methodDefinitions = '(\w+)\s(\/.*)\sHTTP\/(?:1\.[10]|2)(\.\.|#015#012|\s*\n\s*|\\r\\n)\w'
             request = unquote(request)
+            #메소드, URL, 줄바꿈 문자 파싱
             verb, path, lineBreak = matched = re.findall(search_methodDefinitions, request)[0]
             lineBreak = lineBreak.strip(' ')
             
-            #request = re.sub('({})([\w-]*\s*:)'.format(lineBreak), r'\1\1\2', unquote(request))
-            #print('rawdata : ', request, '\n\n')
-
-            #request = request.replace(lineBreak * 2, '\n').split('\n')
             raw_request = request.replace(lineBreak, '\n')
             request = raw_request.split('\n')
             
             
+            #헤더 파싱
             search_headerFields = '^([\w-]+)\s*:\s*(.+)'
             c = 0
             for i, line in enumerate(request[1:], start=1):
@@ -71,6 +79,7 @@ def main(request, checkType, url="", beautify=False):
                     break
                 matched = matched[0]
                 if compare('host', matched[0]):
+                    #호스트에 포트가 지정되어 있을 경우
                     port = re.search(':(\d+)', matched[1])
                     host = re.sub(':\d+', '', matched[1])
                     continue
@@ -81,26 +90,18 @@ def main(request, checkType, url="", beautify=False):
                 convs = matched[0].split('-')
                 headers['-'.join([setSyntax(conv) for conv in convs])] = matched[1].strip()
             i += 1 - c
-            #print('rawdata : ', request, '\n\n')
+            #로우데이터 파싱
             search_dataset = '[\w_-]+\s*\=\s*.+'
             search_file = '([\w-]+)\s*\=\s*([^&]*)&*'
             rawdata = '\n'.join(request[i:])
-
-            # dataset
+            # 파라미터 형태로 전달됐을 경우 JSON 형태로 파싱
             if re.match(search_dataset, rawdata) != None:
                 matched = re.findall('([\w-]+)\s*\=\s*(.+)(?=&\w+)', rawdata)
                 matched = [re.sub('([\w_-]+)=', r'\1\n', pair).split('\n') for pair in
                            re.sub('&([\w_-]+=)', r'\n\1', rawdata).split('\n')]
                 data = reduce(setData, matched, {})
-            # rawdata
+            # 그 외
             else:
-                # file set
-                #if type_file:
-                    #rawdata = ''.join(request[i:]).strip()
-                    # search_boundary = 'boundary=(-*\w+)'
-                    # boundary = '--' + re.search(search_boundary, headers['Content-Type']).group(1)
-                    #rawdata = mySub(f'(?:{lineBreak})(' + boundary + '(?:-{2})*)', r'\n\1', rawdata)
-                    #rawdata = re.sub('({}(?:-{2})*)(?:\.{2}|#015#012)'.format(boundary), r'\1\n', rawdata)
                 data = rawdata.strip()
             if port != None:
                 port = port.group(1)
@@ -108,6 +109,7 @@ def main(request, checkType, url="", beautify=False):
                     protocol = 'HTTPS'
                 elif port == '80':
                     protocol = 'HTTP'
+            #파싱 완료되었으면 저장
             format_REQ = {
                 'Protocol': protocol.upper(),
                 'Verb': verb.upper(),
@@ -122,6 +124,7 @@ def main(request, checkType, url="", beautify=False):
 
     try:
         if url != "":
+            #url이 지정되어 있을 경우 해당 url 사용
             url = url + format_REQ['Path']
         else:
             url = '{}://'.format(format_REQ['Protocol'].lower()) + format_REQ['Host'] + format_REQ['Path']
@@ -130,6 +133,7 @@ def main(request, checkType, url="", beautify=False):
             format_REQ['Headers']['Content-Length'] = str(len(rawdata) + 10)
         if beautify:
             return {'Error': 0, 'Format': format_REQ, 'RAW_REQUEST' : raw_request}
+        #요청값을 가지고 실제 요청하여 응답값 확인
         response = getResponse(format_REQ['Verb'], url, format_REQ['Headers'], format_REQ['Data'])
     except Exception as e:
         print('error msg : ', str(e))
