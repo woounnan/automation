@@ -228,6 +228,7 @@ def parseFunc(key, y):
 
 
 def validation(menus, code, y):
+    #포지션이 메뉴를 벗어나는지 확인
     if 0 > (code + y) or len(menus) - 1 < (code + y):
         return 0
     return code
@@ -239,6 +240,7 @@ keyCode = {'H': -1, 'P': 1, 'K': 0, 'M': 0}
 stage = ['src', 'summary']
 parseNews()
 past = 0
+#메뉴에 단계적으로 접근하는 것을 level 변수를 활용하여 구현
 while level >= 0:
     if sel != -1:
         output = srcs[stage[level]][sel][:]
@@ -251,9 +253,12 @@ while level >= 0:
     key = getch()
     if key == b'\xe0':
         key = getch()
+        #상태 메시지 설정
         msg_state = msg_cur
+        #현재 활성화된 메뉴가 전체 뉴스 목록일 경우
         if flag_movP == 0:
             y += validation(output, keyCode[key.decode()], y)
+        #현재 활성화된 메뉴가 '선택된 뉴스 목록'일 경우
         else:
             idx_article += validation(articles, keyCode[key.decode()], idx_article)
         continue
