@@ -12,7 +12,7 @@ from binascii import hexlify
 requests.packages.urllib3.disable_warnings()
 
 botEmail = "hyeok_jang_responsebot@webex.bot"
-accessToken = "NTU3MWEwMGQtZGIzMi00N2EzLTllNzEtNzE3MTg5MGY5N2MzZDA4YTkzZjEtZGFl_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
+accessToken = "your bot's access toke"
 headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json", 'Accept' : 'application/json'}
 TIME_WAIT = 0.5
 
