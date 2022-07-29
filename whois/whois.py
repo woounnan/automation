@@ -15,8 +15,9 @@ test = '1'
 whitelist_ip = ''
 whitelist_description = ''
 whitelist_country = ''
-botEmail = "your bot email address"
-accessToken = "your accesstoken"
+botEmail = "bob8gook_whois@webex.bot"
+accessToken = "MGY3ZWI0N2ItZjI0ZC00MzQ2LWFlNjYtNDc0MWM3NDNlNGQ2ODI1MzQ4MzAtZmMz_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
+#accessToken = "N2MyNzY5OTAtODA4ZS00ZTA3LWI4YmYtYWE5MmJiODg2NmQ3YmY5MjBkNTAtMWFl_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
 headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json", 'Accept' : 'application/json'}
 
 def GetInfo(ip):
@@ -51,6 +52,13 @@ def SendMessage(payload, msg):
     payload["text"] = str(msg)
     response = requests.request("POST", "https://webexapis.com/v1/messages", data=json.dumps(payload),
                                     headers=headers)
+    response = json.loads(response.text)
+    return {'messageId' : response['id']}
+
+def ModifyMessage(payload, msg, messageId):
+    payload["text"] = str(msg)
+    requests.request("PUT", "https://webexapis.com/v1/messages/{}".format(messageId),
+                                                data=json.dumps(payload), headers=headers)
     
 def SendFile(fullPath, roomId, text=""):
     print('send the file')
@@ -93,8 +101,6 @@ def get_tasks():
     response = json.loads(
     requests.request("GET", "https://api.ciscospark.com/v1/messages/{}".format(messageId), headers=headers).text)
     
-    print('\n\n[*] response : ' + str(response))
-    print('\n\n')
     
     try:
     	msgs = response['text'].strip().split('\n')
@@ -107,17 +113,16 @@ def get_tasks():
     regex_whitelist = r"/(up|down) (ip|description|country)"
     regex_ip = r'(?:\d{1,3}\.){3}\d{1,3}'
     if header.startswith('/help'):
-        msg = '[*] IP 조회\n'
-        msg += '● \' [조회 IP] \'\n'
-        msg += '\n[*] 화이트리스트 다운/업로드\n'
-        msg += '● \' /[up | down]  [ip | country | description] \'\n'
-        msg += '● 화이트리스트 파일 업로드시 바로 적용됩니다.\n'
-        msg += '\n[*] 파일 양식\n'
-        msg += '● IP : ip;;설명\n'
-        msg += '● Description : description;;설명\n'
-        msg += '● Country : country\n'
-        
-        SendMessage(payload, msg)
+        menu = '[*] IP 조회\n'
+        menu += '● \' [조회 IP] \'\n'
+        menu += '\n[*] 화이트리스트 다운/업로드\n'
+        menu += '● \' /[up | down]  [ip | country | description] \'\n'
+        menu += '● 화이트리스트 파일 업로드시 바로 적용됩니다.\n'
+        menu += '\n[*] 파일 양식\n'
+        menu += '● IP : ip;;설명\n'
+        menu += '● Description : description;;설명\n'
+        menu += '● Country : country\n'
+        SendMessage(payload, menu)
     elif re.match(regex_whitelist, header):
         action, target = re.findall(regex_whitelist, header)[0]
         if action == 'down':
@@ -148,15 +153,28 @@ def get_tasks():
             LoadWhitelist(email)
             SendMessage(payload, f"[*] 화이트리스트 {target} 적용 완료.")
     elif re.match(regex_ip, header):
-        SendMessage(payload, '[*] IP를 조회하시려는 군요')
         list_ip = re.findall(regex_ip, ' '.join(msgs))
-        #filter cdn
+        SendMessage(payload, '[*] 입력한 IP를 조회합니다. [{}개]'.format(len(list_ip)))
         outputs_trusted = []
         outputs_censored = []
         outputs_ip = []
-        for ip in list_ip:
+        outputs_failed = []
+
+        extend = 3
+        totalLen = len(list_ip)
+        progress = 1
+        if totalLen > 20:
+        	messageId = SendMessage(payload, '[*] 진행률 : 0% [ 0 / {} ] \n'.format(totalLen) + '▷ ' * 10 * extend)['messageId']
+        time_start = time.time()
+        for idx in range(len(list_ip)):
+            ip = list_ip[idx]
+            if idx + 1 > progress * (totalLen/10) and progress < 9 and totalLen > 20:
+                ModifyMessage(payload, '[*] 진행률 : {}% [ {} / {} ] ; {} seconds\n'.format(round(idx/totalLen, 2)*100, idx+1, totalLen, round(time.time() - time_start, 2)) + '▶ ' * progress * extend + '▷ ' * (10 - progress) * extend, messageId)
+                progress += 1
             result = GetInfo(ip)
+            #time.sleep(0.2)
             if not result['state']:
+                outputs_failed.append(ip)
                 continue
             ipInfo = result['whois']
             
@@ -200,6 +218,9 @@ def get_tasks():
             else:
                 outputs_censored.append(output)
         
+        if totalLen > 20:
+        	ModifyMessage(payload, '[*] 진행률 : 100% [ {} / {} ] ; {} seconds\n'.format(totalLen, totalLen, round(time.time() - time_start, 2)) + '▶ ' * 10* extend, messageId)
+                    
         outputs = ''
         if len(outputs_trusted) > 0:
             outputs += "[*] 안전\n"
@@ -210,6 +231,12 @@ def get_tasks():
                 outputs += "\n\n"
             outputs += "[*] 위험\n"
             outputs += "\n".join(outputs_censored)
+                    
+        if len(outputs_failed) > 0:
+            if len(outputs) > 1:
+                outputs += "\n\n"
+            outputs += "[*] 룩업 실패\n"
+            outputs += "\n".join(outputs_failed)
         
         if len(outputs_trusted) + len(outputs_censored) > 10 :
             with open('list_whois.txt', 'w') as f:
