@@ -1,7 +1,5 @@
+
 #!/usr/bin/python3
-# $ ./whois_cli.py 52.3.137.27
-# prints whois data to terminal
-# made available under MIT license (see LICENSE)
 
 from ipwhois import IPWhois
 from sys import argv
@@ -16,7 +14,8 @@ whitelist_ip = ''
 whitelist_description = ''
 whitelist_country = ''
 botEmail = "bob8gook_whois@webex.bot"
-accessToken = "your bot's access token"
+accessToken = "MGY3ZWI0N2ItZjI0ZC00MzQ2LWFlNjYtNDc0MWM3NDNlNGQ2ODI1MzQ4MzAtZmMz_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
+#accessToken = "N2MyNzY5OTAtODA4ZS00ZTA3LWI4YmYtYWE5MmJiODg2NmQ3YmY5MjBkNTAtMWFl_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
 headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json", 'Accept' : 'application/json'}
 
 def GetInfo(ip):
@@ -76,16 +75,27 @@ def LoadWhitelist(padding = '@'):
     os.system(f'cp descriptions.txt descriptions{padding}.txt')
     os.system(f'cp countries.txt countries{padding}.txt')
     with open(f'cdns{padding}.txt', 'r') as f:
-        whitelist_ip = f.read().split('\n')
+        whitelist_ip = [x for x in f.read().split('\n') if len(x) > 0]
     with open(f'descriptions{padding}.txt', 'r') as f:
-        whitelist_description = f.read().split('\n')
+        whitelist_description = [x for x in f.read().split('\n') if len(x) > 0]
+        print('[*] description : ' + str(whitelist_description))
     with open(f'countries{padding}.txt', 'r') as f:
-        whitelist_country = f.read().split('\n')
+        whitelist_country = [x for x in f.read().split('\n') if len(x) > 0]
     os.system(f'rm cdns{padding}.txt')
     os.system(f'rm descriptions{padding}.txt')
     os.system(f'rm countries{padding}.txt')
 app = Flask(__name__)
 
+
+@app.route('/kisa', methods=['GET'])
+def TestKisa(roomId):
+    os.system('wget --mirror --convert-links --adjust-extension --page-requisites  --no-parent https://krcert.or.kr/data/secNoticeView.do?bulletin_writing_sequence=66834')
+    time.sleep(2)
+    print('[*] zip file')
+    os.system('zip -r kisa.zip krcert*')
+    SendFile('kisa.zip', roomId,'')
+    os.system('rm -rf kisa.zip')
+    return {'status' : 'success'}
 
 @app.route('/', methods=['POST'])
 def get_tasks():
@@ -95,7 +105,7 @@ def get_tasks():
     
     if email == botEmail:
         return ("")
-
+    #TestKisa(roomId)
     payload = {"roomId": roomId}
     response = json.loads(
     requests.request("GET", "https://api.ciscospark.com/v1/messages/{}".format(messageId), headers=headers).text)
@@ -221,20 +231,23 @@ def get_tasks():
         	ModifyMessage(payload, '[*] 진행률 : 100% [ {} / {} ] ; {} seconds\n'.format(totalLen, totalLen, round(time.time() - time_start, 2)) + '▶ ' * 10* extend, messageId)
                     
         outputs = ''
-        if len(outputs_trusted) > 0:
-            outputs += "[*] 안전\n"
+        len_trusted = len(outputs_trusted)
+        if len_trusted > 0:
+            outputs += f"[*] 안전 [ {len_trusted} / {totalLen} ]\n"
             outputs += "\n".join(outputs_trusted)
             
+        len_censored = len(outputs_censored)
         if len(outputs_censored) > 0:
             if len(outputs) > 1:
                 outputs += "\n\n"
-            outputs += "[*] 위험\n"
+            outputs += f"[*] 위험 [ {len_censored} / {totalLen} ]\n"
             outputs += "\n".join(outputs_censored)
                     
+        len_failed = len(outputs_failed)
         if len(outputs_failed) > 0:
             if len(outputs) > 1:
                 outputs += "\n\n"
-            outputs += "[*] 룩업 실패\n"
+            outputs += f"[*] 룩업 실패 [ {len_failed} / {totalLen} ]\n"
             outputs += "\n".join(outputs_failed)
         
         if len(outputs_trusted) + len(outputs_censored) > 10 :
