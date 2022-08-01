@@ -15,13 +15,15 @@ import threading
 from datetime import datetime
 
 botEmail = "bob8gook_kisa@webex.bot"
-accessToken = "your bot token"
+accessToken = "your bot's access token"
 headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json", 'Accept' : 'application/json'}
 roomId_kisa_private = 'Y2lzY29zcGFyazovL3VzL1JPT00vNDkwNzIwMjAtMTBhNy0xMWVkLTk4ZDktNzU3YWU5MmY2MDFh' #kisa 개인방
 roomId_soc = 'Y2lzY29zcGFyazovL3VzL1JPT00vZmIwY2M1YTAtMDYzZS0xMWVjLWExNzgtZDEzYjhjMjEwNzVk'
 roomId_availability = 'Y2lzY29zcGFyazovL3VzL1JPT00vZTVmMmJiYTAtMTE2Ni0xMWVkLThmMjctZmQ4YjY5ODZmODc3'
 roomId_use = roomId_soc
 num_last = 1785
+now = datetime.now()
+
 url = 'https://krcert.or.kr'
 fPath = '/workspace/mysql/kisa'
 enc = hashlib.md5()
@@ -116,7 +118,7 @@ def CheckNotice():
                 
 app = Flask(__name__)
 @app.route('/', methods=['POST'])
-def BotComu():
+def receive():
     data = request.json.get('data')
     email, messageId = data['personEmail'], data['id']
     print('message : ' + str(data))
@@ -126,6 +128,16 @@ def BotComu():
     #print(str(response))
     #msgs = response['text'].strip().split('\n')
     #SendMessage(payload, "test")
+    return {'status' : 'success', 'num_last': num_last}
+
+@app.route('/', methods=['GET'])
+def BotComu():
+    global roomId_kisa_private, num_last
+    for fPath, title in CheckNotice():
+    	SendFile(fPath, roomId_kisa_private, title)
+    	system(f"rm {fPath}")
+    num = request.args.get("num")
+    num_last = num
     return {'status' : 'success', 'num_last': num_last}
 
 def GS25():
@@ -138,7 +150,7 @@ def GS25():
     
 def CallerCheck():
     sched = BlockingScheduler(timezone='Asia/Seoul')
-    sched.add_job(GS25,'interval', minutes=80, id='kisa')
+    sched.add_job(GS25,'interval', minutes=30, id='kisa')
     sched.start()
 def CallerCheck2():
     sched = BlockingScheduler(timezone='Asia/Seoul')
@@ -147,11 +159,13 @@ def CallerCheck2():
     sched.start()
     
 def CheckAvailability():
-    global roomId_availability
-    now = datetime.now()
+    global roomId_availability, now
     payload = {"roomId": roomId_availability}
     SendMessage(payload, "[{}] 상태 체크".format(now.strftime('%Y-%m-%d %H:%M:%S')))
 
+
+#payload = {"roomId": roomId_availability}
+#SendMessage(payload, "[{}] 서버를 실행합니다.".format(now.strftime('%Y-%m-%d %H:%M:%S')))
 t = threading.Thread(target=CallerCheck)
 t.start()
 t2 = threading.Thread(target=CallerCheck2)
