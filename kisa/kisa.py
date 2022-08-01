@@ -18,9 +18,9 @@ accessToken = "YzE4Y2ZhYjAtMDk5Yy00NTZlLWIwYjAtODYwNzQwNDExOWRmMDFjZmI1ODYtM2Rm_
 headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json", 'Accept' : 'application/json'}
 roomId = 'Y2lzY29zcGFyazovL3VzL1JPT00vNDkwNzIwMjAtMTBhNy0xMWVkLTk4ZDktNzU3YWU5MmY2MDFh'
 
-num_last = 1777
+num_last = 1782
 url = 'https://krcert.or.kr'
-fPath = '/workspace/mysql/test'
+fPath = '/workspace/mysql/kisa'
 enc = hashlib.md5()
 
 def DownloadFullPage(url, fPath):  
@@ -52,8 +52,10 @@ def SendFile(fullPath, roomId, text=""):
 
 def CheckNotice():
     print("???")
+    global num_last
+    list_files = []
     for page in range(5,0,-1):
-        print("url : " + f"{url}/data/secNoticeList.do?page={page}")
+        #print("url : " + f"{url}/data/secNoticeList.do?page={page}")
         response = requests.get(f"{url}/data/secNoticeList.do?page={page}")
         soup = bs(response.text, "html.parser")
         elements = soup.select('#contentDiv > table > tbody > tr')
@@ -64,8 +66,8 @@ def CheckNotice():
             link = url + tds[1].find('a')['href']
             date = tds[4].get_text().strip()
             try:
-                if num == '1780':
-                #if int(num) > int(num_last):
+                #if num == '1780':
+                if int(num) > int(num_last):
                     date = ''.join(date.split('.')[1:])
                     title = '_'.join(title.split(' '))
                     htmlPath = f'{fPath}/{date}_{title}_{num}'
@@ -89,39 +91,45 @@ def CheckNotice():
 
                     with open(f'{sourcePath}/{htmlName}', 'w') as f:
                         f.write(source)
-                    print('htmlpath : ' + htmlPath)
-                    system(f'zip -r {fPath}/{date}_{title}_{num}.zip {htmlPath}')
-                    system(f'rm -rf {htmlPath}')
+                    os.chdir(fPath + f'/{date}_{title}_{num}/recognisable-name/')
+                    time.sleep(2)
+                    system(f'zip -r {date}_{title}_{num}.zip *')
+                    system(f'mv {date}_{title}_{num}.zip {fPath}')
+                    list_files.append([f'{fPath}/{date}_{title}_{num}.zip', f'[*] 새로운 보안공지 확인\n[{num}] {title} ({date})'])
+                    time.sleep(2)
+                    os.chdir(fPath)
+                    system(f'rm -rf {date}_{title}_{num}')
+                    num_last = int(num)
             except ValueError:
                 print(f'[*] 보안공지 다운로드 실패 : {date}_{title}_{num}')
-    return f'{fPath}/{date}_{title}_{num}.zip'
+    return list_files
 
                 
 app = Flask(__name__)
 @app.route('/', methods=['GET'])
 def BotComu():
-    global roomId
-    data = request.json.get('data')
-    email, messageId = data['personEmail'], data['id']
+    global roomId, num_last
+    #data = request.json.get('data')
+    #email, messageId = data['personEmail'], data['id']
     
-    if email == botEmail:
-        return ("")
+    #if email == botEmail:
+    #    return ("")
     payload = {"roomId": roomId}
-    fPath = CheckNotice()
-    SendFile(fPath, roomId, "")
-    system(f"rm {fPath}")
+    for fPath, title in CheckNotice():
+    	SendFile(fPath, roomId, title)
+    	system(f"rm {fPath}")
     #response = json.loads(requests.request("GET", "https://api.ciscospark.com/v1/messages/{}".format(messageId), headers=headers).text)
     #print(str(response))
     #msgs = response['text'].strip().split('\n')
     #SendMessage(payload, "test")
-    return {'status' : 'success'}
+    return {'status' : 'success', 'num_last': num_last}
 
 def CallerCheck():
     sched = BlockingScheduler(timezone='Asia/Seoul')
     sched.add_job(BotComu,'interval', seconds=30, id='kisa') #,args=['hello?'])
     sched.start()
 
-CheckNotice()
+
 #t = threading.Thread(target=CallerCheck)
 #t.start()
 app.run(host="0.0.0.0", port=8777)
