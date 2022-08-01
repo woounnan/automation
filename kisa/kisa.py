@@ -12,13 +12,16 @@ import re
 import hashlib
 from apscheduler.schedulers.background import BlockingScheduler
 import threading
+from datetime import datetime
 
 botEmail = "bob8gook_kisa@webex.bot"
-accessToken = "YzE4Y2ZhYjAtMDk5Yy00NTZlLWIwYjAtODYwNzQwNDExOWRmMDFjZmI1ODYtM2Rm_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
+accessToken = "your bot token"
 headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json", 'Accept' : 'application/json'}
-roomId = 'Y2lzY29zcGFyazovL3VzL1JPT00vNDkwNzIwMjAtMTBhNy0xMWVkLTk4ZDktNzU3YWU5MmY2MDFh'
-
-num_last = 1782
+roomId_kisa_private = 'Y2lzY29zcGFyazovL3VzL1JPT00vNDkwNzIwMjAtMTBhNy0xMWVkLTk4ZDktNzU3YWU5MmY2MDFh' #kisa 개인방
+roomId_soc = 'Y2lzY29zcGFyazovL3VzL1JPT00vZmIwY2M1YTAtMDYzZS0xMWVjLWExNzgtZDEzYjhjMjEwNzVk'
+roomId_availability = 'Y2lzY29zcGFyazovL3VzL1JPT00vZTVmMmJiYTAtMTE2Ni0xMWVkLThmMjctZmQ4YjY5ODZmODc3'
+roomId_use = roomId_soc
+num_last = 1785
 url = 'https://krcert.or.kr'
 fPath = '/workspace/mysql/kisa'
 enc = hashlib.md5()
@@ -52,7 +55,7 @@ def SendFile(fullPath, roomId, text=""):
 
 def CheckNotice():
     print("???")
-    global num_last
+    global num_last, roomId_soc
     list_files = []
     for page in range(5,0,-1):
         #print("url : " + f"{url}/data/secNoticeList.do?page={page}")
@@ -64,11 +67,16 @@ def CheckNotice():
             num = tds[0].get_text().strip()
             title = tds[1].get_text().strip()
             link = url + tds[1].find('a')['href']
-            date = tds[4].get_text().strip()
+            fullDate = tds[4].get_text().strip()
             try:
+                num = int(num)
+            except ValueError:
+                print(f'[*] 보안공지 다운로드 실패 - 아마 공지사항.. : {fullDate}_{title}_{num}')
+                continue
                 #if num == '1780':
-                if int(num) > int(num_last):
-                    date = ''.join(date.split('.')[1:])
+            try:
+                if num > int(num_last):
+                    date = ''.join(fullDate.split('.')[1:])
                     title = '_'.join(title.split(' '))
                     htmlPath = f'{fPath}/{date}_{title}_{num}'
                     DownloadFullPage(link, htmlPath)
@@ -95,41 +103,57 @@ def CheckNotice():
                     time.sleep(2)
                     system(f'zip -r {date}_{title}_{num}.zip *')
                     system(f'mv {date}_{title}_{num}.zip {fPath}')
-                    list_files.append([f'{fPath}/{date}_{title}_{num}.zip', f'[*] 새로운 보안공지 확인\n[{num}] {title} ({date})'])
+                    list_files.append([f'{fPath}/{date}_{title}_{num}.zip', f'[*] 새로운 보안공지 확인\n[{num}] {title} ({fullDate})'])
                     time.sleep(2)
                     os.chdir(fPath)
                     system(f'rm -rf {date}_{title}_{num}')
                     num_last = int(num)
-            except ValueError:
-                print(f'[*] 보안공지 다운로드 실패 : {date}_{title}_{num}')
+            except:
+                payload = {"roomId": roomId_soc}
+                SendMessage(payload, f'[*] 보안공지 다운로드 실패 - 수동 확인 필요 : {fullDate}_{title}_{num}')
     return list_files
 
                 
 app = Flask(__name__)
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['POST'])
 def BotComu():
-    global roomId, num_last
-    #data = request.json.get('data')
-    #email, messageId = data['personEmail'], data['id']
-    
-    #if email == botEmail:
-    #    return ("")
-    payload = {"roomId": roomId}
-    for fPath, title in CheckNotice():
-    	SendFile(fPath, roomId, title)
-    	system(f"rm {fPath}")
-    #response = json.loads(requests.request("GET", "https://api.ciscospark.com/v1/messages/{}".format(messageId), headers=headers).text)
+    data = request.json.get('data')
+    email, messageId = data['personEmail'], data['id']
+    print('message : ' + str(data))
+    if email == botEmail:
+        return ("")
+    response = json.loads(requests.request("GET", "https://api.ciscospark.com/v1/messages/{}".format(messageId), headers=headers).text)
     #print(str(response))
     #msgs = response['text'].strip().split('\n')
     #SendMessage(payload, "test")
     return {'status' : 'success', 'num_last': num_last}
 
+def GS25():
+    global roomId_soc, num_last
+    print('Im GS25  - num last : ' + str(num_last))
+    for fPath, title in CheckNotice():
+    	SendFile(fPath, roomId_soc, title)
+    	system(f"rm {fPath}")
+    print('Bye Bye - num last : ' + str(num_last))
+    
 def CallerCheck():
     sched = BlockingScheduler(timezone='Asia/Seoul')
-    sched.add_job(BotComu,'interval', seconds=30, id='kisa') #,args=['hello?'])
+    sched.add_job(GS25,'interval', minutes=80, id='kisa')
     sched.start()
+def CallerCheck2():
+    sched = BlockingScheduler(timezone='Asia/Seoul')
+    #sched.add_job(CheckAvailability,'interval', minutes=60*12, id='availability')
+    sched.add_job(CheckAvailability,'interval', minutes=60*12, id='availability')
+    sched.start()
+    
+def CheckAvailability():
+    global roomId_availability
+    now = datetime.now()
+    payload = {"roomId": roomId_availability}
+    SendMessage(payload, "[{}] 상태 체크".format(now.strftime('%Y-%m-%d %H:%M:%S')))
 
-
-#t = threading.Thread(target=CallerCheck)
-#t.start()
+t = threading.Thread(target=CallerCheck)
+t.start()
+t2 = threading.Thread(target=CallerCheck2)
+t2.start()
 app.run(host="0.0.0.0", port=8777)
