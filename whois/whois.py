@@ -7,15 +7,25 @@ from flask import Flask, request
 from requests.packages.urllib3.util.retry import Retry
 import requests.packages.urllib3, requests, json, time, datetime, re, os, csv
 from binascii import hexlify
+from collections import Counter
 import pycountry
+import threading
+from apscheduler.schedulers.background import BlockingScheduler
 
 test = '1'
 whitelist_ip = ''
 whitelist_description = ''
 whitelist_country = ''
-botEmail = "bob8gook_whois@webex.bot"
-accessToken = "your bot's access token"
+botEmail = "bob8gookmessi@webex.bot"
+accessToken = "ODFlZGUyNDYtOGZmZS00YWU2LTliZGQtOWQ2MWUxM2E0MjNiOTM5MDJkODYtMDlh_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
+#accessToken = "N2MyNzY5OTAtODA4ZS00ZTA3LWI4YmYtYWE5MmJiODg2NmQ3YmY5MjBkNTAtMWFl_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
 headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json", 'Accept' : 'application/json'}
+
+roomId_availability = 'Y2lzY29zcGFyazovL3VzL1JPT00vZTVmMmJiYTAtMTE2Ni0xMWVkLThmMjctZmQ4YjY5ODZmODc3'
+
+now = datetime.datetime.now()
+now = now + datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=9, weeks=0)
+
 
 def GetInfo(ip):
     try:
@@ -68,21 +78,23 @@ def SendFile(fullPath, roomId, text=""):
          https://webexapis.com/v1/messages"""
         os.system(cmd)
 
-def LoadWhitelist(padding = '@'):
+def LoadWhitelist(padding = '_'):
     global whitelist_ip, whitelist_description, whitelist_country
-    os.system(f'cp cdns.txt cdns{padding}.txt')
-    os.system(f'cp descriptions.txt descriptions{padding}.txt')
-    os.system(f'cp countries.txt countries{padding}.txt')
-    with open(f'cdns{padding}.txt', 'r') as f:
+    os.system(f'cp /workspace/news/whois/cdns.txt /workspace/news/whois/cdns{padding}.txt')
+    os.system(f'cp /workspace/news/whois/descriptions.txt /workspace/news/whois/descriptions{padding}.txt')
+    os.system(f'cp /workspace/news/whois/countries.txt /workspace/news/whois/countries{padding}.txt')
+    print('@@' + f'cp cdns.txt cdns{padding}.txt')
+    time.sleep(1)
+    with open(f'/workspace/news/whois/cdns{padding}.txt', 'r') as f:
         whitelist_ip = [x for x in f.read().split('\n') if len(x) > 0]
-    with open(f'descriptions{padding}.txt', 'r') as f:
+    with open(f'/workspace/news/whois/descriptions{padding}.txt', 'r') as f:
         whitelist_description = [x for x in f.read().split('\n') if len(x) > 0]
         print('[*] description : ' + str(whitelist_description))
-    with open(f'countries{padding}.txt', 'r') as f:
+    with open(f'/workspace/news/whois/countries{padding}.txt', 'r') as f:
         whitelist_country = [x for x in f.read().split('\n') if len(x) > 0]
-    os.system(f'rm cdns{padding}.txt')
-    os.system(f'rm descriptions{padding}.txt')
-    os.system(f'rm countries{padding}.txt')
+    os.system(f'rm /workspace/news/whois/cdns{padding}.txt')
+    os.system(f'rm /workspace/news/whois/descriptions{padding}.txt')
+    os.system(f'rm /workspace/news/whois/countries{padding}.txt')
 app = Flask(__name__)
 
 
@@ -98,7 +110,6 @@ def TestKisa(roomId):
 
 @app.route('/', methods=['POST'])
 def get_tasks():
-        
     data = request.json.get('data')
     email, roomId, messageId = data['personEmail'], data['roomId'], data['id']
     
@@ -121,8 +132,9 @@ def get_tasks():
     regex_whitelist = r"/(up|down) (ip|description|country)"
     regex_ip = r'(?:\d{1,3}\.){3}\d{1,3}'
     if header.startswith('/help'):
-        menu = '[*] IP 조회\n'
-        menu += '● \' [조회 IP] \'\n'
+        menu = '[*] IP 조회'
+        menu += '● \' [조회 IP] [option]\'\n'
+        menu += '● 옵션 : \' --excel | -e\' 입력시 결과를 엑셀파일로 생성 \'\n'
         menu += '\n[*] 화이트리스트 다운/업로드\n'
         menu += '● \' /[up | down]  [ip | country | description] \'\n'
         menu += '● 화이트리스트 파일 업로드시 바로 적용됩니다.\n'
@@ -160,14 +172,16 @@ def get_tasks():
 
             LoadWhitelist(email)
             SendMessage(payload, f"[*] 화이트리스트 {target} 적용 완료.")
-    elif re.match(regex_ip, header):
+    elif re.search(regex_ip, header):
         list_ip = re.findall(regex_ip, ' '.join(msgs))
+        list_ip = list(dict(Counter(list_ip)).keys())
+        opt_format = re.findall('(?:--excel|-e)', ''.join(msgs))
         SendMessage(payload, '[*] 입력한 IP를 조회합니다. [{}개]'.format(len(list_ip)))
         outputs_trusted = []
         outputs_censored = []
         outputs_ip = []
+        excel_ip = []
         outputs_failed = []
-
         extend = 3
         totalLen = len(list_ip)
         progress = 1
@@ -191,12 +205,14 @@ def get_tasks():
             country = pycountry.countries.get(alpha_2=ipInfo['Country code']).name
             
             output = ''
+            censor_msg = ''
             
             op  = f'IP : {ip} '
             for wl in whitelist_ip:
                 cdn, description = wl.split(';;')
                 if ip.startswith(cdn):
-                    op = "● " + op + ' --> [' + cdn + f' ({description})' + ']'
+                    censor_msg = cdn + f' ({description})'
+                    op = "● " + op + ' --> [' + censor_msg + ']'
                     censored = 1
                     break
             output += output + op + '\n'
@@ -205,6 +221,7 @@ def get_tasks():
             for ctry in whitelist_country:
                 ctry = ctry.replace(' ', '').lower()
                 if ctry in country.replace(' ', '').lower():
+                    censor_msg = '[화이트리스트]'
                     op = "● " + op + ' --> [화이트리스트]'
                     censored = 1
                     break
@@ -215,6 +232,7 @@ def get_tasks():
                 owner, description = wl.split(';;')
                 owner = owner.replace(' ', '').lower()
                 if owner in ipInfo['Description'].replace(' ', '').lower():
+                    censor_msg = owner + f' ({description})'
                     op = "● " + op + ' --> [' + owner + f' ({description})' + ']'
                     censored = 1
                     break
@@ -225,6 +243,7 @@ def get_tasks():
                 outputs_trusted.append(output)
             else:
                 outputs_censored.append(output)
+            excel_ip.append([ip, country, ipInfo["Description"], censor_msg])
         
         if totalLen > 20:
         	ModifyMessage(payload, '[*] 진행률 : 100% [ {} / {} ] ; {} seconds\n'.format(totalLen, totalLen, round(time.time() - time_start, 2)) + '▶ ' * 10* extend, messageId)
@@ -248,7 +267,7 @@ def get_tasks():
                 outputs += "\n\n"
             outputs += f"[*] 룩업 실패 [ {len_failed} / {totalLen} ]\n"
             outputs += "\n".join(outputs_failed)
-        
+            
         if len(outputs_trusted) + len(outputs_censored) > 10 :
             with open('list_whois.txt', 'w') as f:
                 f.write(outputs)
@@ -271,10 +290,37 @@ def get_tasks():
             SendFile('list_ip.txt', roomId, '')
         else:
         	SendMessage(payload, msg)
+            
+        
+        if len(opt_format) > 0 :
+            fullPath = '/workspace/news/whois/result.csv'
+            excel_ip.insert(0, ['IP', 'Country', 'Description', 'Reason'])
+            with open(fullPath, 'w', encoding='utf-8-sig', newline='') as f_write:
+                writer = csv.writer(f_write)
+                for row in excel_ip:
+                    writer.writerow(row)
+            SendFile(fullPath, roomId, '')
+            os.system('rm -f ' + fullPath)
     else:
         SendMessage(payload, f'-bash: {header}: command not found (Type "/help")')
     return ({'status': 'Success'})
 
+
+def CallerCheck():
+    sched = BlockingScheduler(timezone='Asia/Seoul')
+    sched.add_job(CheckAvailability,'interval', minutes=60*24, id='availability')
+    sched.start()
+    
+def CheckAvailability():
+    global roomId_availability, now
+    payload = {"roomId": roomId_availability}
+    now = datetime.datetime.now()
+    now = now + datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=9, weeks=0)
+    SendMessage(payload, "[{}] 상태 체크".format(now.strftime('%Y-%m-%d %H:%M:%S')))
+#payload = {"roomId": roomId_availability}
+#SendMessage(payload, "[{}] 상태 체크".format(now.strftime('%Y-%m-%d %H:%M:%S')))
+#t = threading.Thread(target=CallerCheck)
+#t.start()
 
 LoadWhitelist()
 app.run(host="0.0.0.0", port=8999)
