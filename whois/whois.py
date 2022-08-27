@@ -12,13 +12,11 @@ import pycountry
 import threading
 from apscheduler.schedulers.background import BlockingScheduler
 
-test = '1'
 whitelist_ip = ''
 whitelist_description = ''
 whitelist_country = ''
-botEmail = "bob8gookmessi@webex.bot"
-accessToken = "ODFlZGUyNDYtOGZmZS00YWU2LTliZGQtOWQ2MWUxM2E0MjNiOTM5MDJkODYtMDlh_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
-#accessToken = "N2MyNzY5OTAtODA4ZS00ZTA3LWI4YmYtYWE5MmJiODg2NmQ3YmY5MjBkNTAtMWFl_PF84_22cb7792-d880-4ec5-b6a6-649d9411bb5e"
+botEmail = bot's email address
+accessToken = bot's token
 headers = {"Authorization": "Bearer %s" % accessToken, "Content-Type": "application/json", 'Accept' : 'application/json'}
 
 roomId_availability = 'Y2lzY29zcGFyazovL3VzL1JPT00vZTVmMmJiYTAtMTE2Ni0xMWVkLThmMjctZmQ4YjY5ODZmODc3'
