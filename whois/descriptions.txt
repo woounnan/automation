@@ -1,0 +1,7 @@
+amazo;;아마존
+microsoft;;마이크로소프트
+google;;구글
+akamai;;아카마이
+oracle;;오라클
+CISCO;;시스코
+LDCC;;롯데정보통신
